@@ -3,6 +3,7 @@ import tornado.ioloop
 import tornado.options
 import tornado.web
 import tornado.httpclient
+import tornado.gen
 
 import urllib
 import json
@@ -15,18 +16,18 @@ define("port", default=8000, help="run on the given port", type=int)
 
 class IndexHandler(tornado.web.RequestHandler):
     @tornado.web.asynchronous
+    @tornado.gen.engine
     def get(self):
         query = self.get_argument('q')
         client = tornado.httpclient.AsyncHTTPClient()
-        client.fetch(
+        response = yield tornado.gen.Task(
+            client.fetch,
             "http://search.twitter.com/search.json?" + \
-            urllib.urlencode({"q": query, "result_type": "recent", "rpp": 100}),
-            callback=self.on_response
+                urllib.urlencode({"q": query, "result_type": "recent", "rpp": 100})
         )
 
-    def on_response(self, response):
         body = json.loads(response.body)
-        result_count = len(body['resultsc'])
+        result_count = len(body['results'])
         now = datetime.datetime.utcnow()
         raw_oldest_tweet_at = body['results'][-1]['created_at']
         oldest_tweet_at = datetime.datetime.strptime(raw_oldest_tweet_at, "%a, %d %b %Y %H:%M:%S +0000")
